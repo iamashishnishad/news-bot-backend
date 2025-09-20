@@ -1,10 +1,15 @@
-import { JinaAI } from "jinaai";
 import { ChromaClient } from "chromadb";
 import axios from "axios";
 import { parseString } from "xml2js";
 import { extract } from "article-parser";
 import fetch from "node-fetch";
 import cheerio from "cheerio";
+import pkg from 'jinaai';
+const { JinaAI } = pkg;
+
+import { ChromaClient } from 'chromadb';
+import axios from 'axios';
+import { parseString } from 'xml2js';
 
 class RealNewsFetcher {
   constructor() {
