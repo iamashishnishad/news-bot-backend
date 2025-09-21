@@ -10,10 +10,12 @@ class SimpleNewsFetcher {
     try {
       console.log('Fetching news from RSS feeds...');
       
-      // Simple RSS feeds that don't require complex parsing
+      // RSS feeds with more technology-focused content
       const rssFeeds = [
         'https://feeds.bbci.co.uk/news/technology/rss.xml',
+        'https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml',
         'https://feeds.bbci.co.uk/news/business/rss.xml',
+        'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml',
         'https://feeds.bbci.co.uk/news/world/rss.xml'
       ];
 
@@ -36,21 +38,50 @@ class SimpleNewsFetcher {
           });
           
           if (parsed.rss && parsed.rss.channel && parsed.rss.channel[0].item) {
-            const items = parsed.rss.channel[0].item.slice(0, 3);
+            const items = parsed.rss.channel[0].item.slice(0, 5); // Get more articles per feed
             
             for (const item of items) {
-              if (articles.length >= 15) break;
+              if (articles.length >= 25) break; // Increase total articles
               
-              const article = {
-                url: item.link[0],
-                title: item.title[0],
-                content: item.description ? item.description[0] : 'No content available',
-                published: item.pubDate ? item.pubDate[0] : new Date().toISOString(),
-                source: 'BBC News'
-              };
-              
-              articles.push(article);
-              console.log(`✓ Added article: ${item.title[0]}`);
+              try {
+                // Try to get more content by fetching the actual article
+                let content = item.description ? item.description[0] : 'No content available';
+                
+                // If it's a short description, try to get more content
+                if (content.length < 100 && item.link && item.link[0]) {
+                  try {
+                    const articleResponse = await axios.get(item.link[0], {
+                      timeout: 5000,
+                      headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                      }
+                    });
+                    // Extract text content from HTML (simple version)
+                    const textContent = articleResponse.data.replace(/<[^>]*>/g, ' ').substring(0, 500);
+                    if (textContent.length > 100) {
+                      content = textContent;
+                    }
+                  } catch (e) {
+                    // If fetching fails, keep the original description
+                    console.log(`Could not fetch full article from ${item.link[0]}`);
+                  }
+                }
+                
+                const article = {
+                  url: item.link[0],
+                  title: item.title[0],
+                  content: content,
+                  published: item.pubDate ? item.pubDate[0] : new Date().toISOString(),
+                  source: feedUrl.includes('nytimes') ? 'New York Times' : 
+                         feedUrl.includes('bbci') ? 'BBC News' : 'News Feed'
+                };
+                
+                articles.push(article);
+                console.log(`✓ Added article: ${item.title[0]}`);
+              } catch (articleError) {
+                console.log(`Skipping article due to error: ${articleError.message}`);
+                continue;
+              }
             }
           }
         } catch (feedError) {
@@ -88,20 +119,35 @@ class SimpleNewsFetcher {
   }
 
   getFallbackArticles() {
+    // Better fallback articles with more technology content
     return [
       {
         url: 'https://www.bbc.com/news/technology',
-        title: 'AI assistants are becoming more capable',
-        content: 'Artificial intelligence assistants are demonstrating improved capabilities in natural language understanding and task completion.',
+        title: 'AI assistants are becoming more capable and integrated',
+        content: 'Artificial intelligence assistants are demonstrating improved capabilities in natural language understanding and task completion. Recent advancements in large language models have enabled more sophisticated interactions between humans and machines across various applications.',
         published: new Date().toISOString(),
-        source: 'BBC'
+        source: 'BBC Technology'
+      },
+      {
+        url: 'https://www.nytimes.com/section/technology',
+        title: 'Tech companies invest billions in AI research and development',
+        content: 'Major technology companies are allocating significant resources toward artificial intelligence research and development. New breakthroughs in machine learning algorithms are enabling applications that were previously considered science fiction, from advanced healthcare diagnostics to autonomous transportation systems.',
+        published: new Date().toISOString(),
+        source: 'New York Times Technology'
       },
       {
         url: 'https://www.bbc.com/news/business',
-        title: 'Global markets show resilience',
-        content: 'Financial markets around the world are demonstrating remarkable resilience amid economic uncertainties.',
+        title: 'Technology sector leads market growth with AI innovations',
+        content: 'The technology sector continues to demonstrate strong performance in global markets, largely driven by innovations in artificial intelligence and cloud computing. Investors are showing increased confidence in companies that are effectively leveraging AI technologies to create new products and services.',
         published: new Date().toISOString(),
-        source: 'BBC'
+        source: 'BBC Business'
+      },
+      {
+        url: 'https://www.nytimes.com/section/business',
+        title: 'Global businesses adopt AI solutions for efficiency gains',
+        content: 'Businesses worldwide are increasingly adopting artificial intelligence solutions to improve operational efficiency and gain competitive advantages. From automated customer service to predictive analytics, AI technologies are transforming traditional business models across multiple industries.',
+        published: new Date().toISOString(),
+        source: 'New York Times Business'
       }
     ];
   }
