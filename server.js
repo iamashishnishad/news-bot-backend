@@ -12,20 +12,43 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-// Correct CORS configuration for Socket.IO
+// Define allowed origins
+const allowedOrigins = [
+  'http://localhost:3000', // Local development
+  'https://news-bot-frontend-uat.netlify.app', // Netlify deployment
+  'https://news-bot-frontend.netlify.app' // If you have another deployment
+];
+
+// CORS configuration for Express
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true
+}));
+
+// CORS configuration for Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ["GET", "POST"],
     credentials: true
   }
 });
-
-// Correct CORS configuration for Express
-app.use(cors({
-  origin: "http://localhost:3000",
-  credentials: true
-}));
 
 app.use(express.json());
 
@@ -134,7 +157,8 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     message: 'Server is running',
-    redis: redisConnected ? 'connected' : 'disconnected'
+    redis: redisConnected ? 'connected' : 'disconnected',
+    allowedOrigins: allowedOrigins
   });
 });
 
@@ -197,6 +221,7 @@ app.post('/api/test/query', async (req, res) => {
 // Socket.io for real-time communication
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
+  console.log('Origin:', socket.handshake.headers.origin);
 
   socket.on('join', (sessionId) => {
     socket.join(sessionId);
@@ -272,7 +297,7 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 5001;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`CORS enabled for: http://localhost:3000`);
+  console.log(`CORS enabled for: ${allowedOrigins.join(', ')}`);
 });
 
 // const express = require('express');
