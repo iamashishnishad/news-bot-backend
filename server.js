@@ -6,11 +6,14 @@ import redis from 'redis';
 import { v4 as uuidv4 } from 'uuid';
 import dotenv from 'dotenv';
 
+
 // Load environment variables
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
+const cors = require('cors');
+
 
 // Correct CORS configuration for Socket.IO
 const io = new Server(server, {
@@ -20,6 +23,14 @@ const io = new Server(server, {
     credentials: true
   }
 });
+
+
+const corsOptions = {
+  origin: [process.env.FRONTEND_URL, 'http://localhost:3001'], // Allow Netlify + local dev
+  credentials: true,
+};
+app.use(cors(corsOptions));
+
 
 // Correct CORS configuration for Express
 app.use(cors({
@@ -275,233 +286,3 @@ server.listen(PORT, () => {
   console.log(`CORS enabled for: http://localhost:3000`);
 });
 
-// const express = require('express');
-// const cors = require('cors');
-// const http = require('http');
-// const socketIo = require('socket.io');
-// const redis = require('redis');
-// const { v4: uuidv4 } = require('uuid');
-// const NewsFetcher = require('./scripts/newsFetcher');
-// const RAGService = require('./services/ragService');
-// const RealNewsFetcher = require('./scripts/realNewsFetcher');
-// const RAGServiceWithJina = require('./services/ragServiceWithJina');
-
-
-
-// require('dotenv').config();
-
-// const app = express();
-// const server = http.createServer(app);
-
-// // Correct CORS configuration for Socket.IO
-// const io = socketIo(server, {
-//   cors: {
-//     origin: "http://localhost:3000", // Your frontend URL
-//     methods: ["GET", "POST"],
-//     credentials: true
-//   }
-// });
-
-// // Correct CORS configuration for Express
-// app.use(cors({
-//   origin: "http://localhost:3000",
-//   credentials: true
-// }));
-
-// app.use(express.json());
-
-// // Create instances
-// // const newsFetcher = new NewsFetcher();
-// // const ragService = new RAGService(newsFetcher);
-
-// const newsFetcher = new RealNewsFetcher();
-// const ragService = new RAGServiceWithJina();
-
-// // Redis client setup with fallback
-// let redisClient;
-// let redisConnected = false;
-
-// // Update the Redis connection section
-// (async () => {
-//   try {
-//     redisClient = redis.createClient({
-//       url: process.env.REDIS_URL || 'redis://localhost:6379',
-//       socket: {
-//         connectTimeout: 5000,
-//         timeout: 5000
-//       }
-//     });
-
-//     redisClient.on('error', (err) => {
-//       console.log('Redis Client Error', err);
-//       redisConnected = false;
-//     });
-    
-//     await redisClient.connect();
-//     redisConnected = true;
-//     console.log('Connected to Redis');
-    
-//     // Test Redis connection
-//     await redisClient.set('test', 'connection_ok');
-//     const testResult = await redisClient.get('test');
-//     console.log('Redis test result:', testResult);
-    
-//   } catch (error) {
-//     console.log('Redis connection failed, using in-memory storage only:', error.message);
-//     redisConnected = false;
-    
-//     // Create a simple in-memory store as fallback
-//     const memoryStore = new Map();
-    
-//     // Mock redis client methods
-//     redisClient = {
-//       lPush: async (key, value) => {
-//         if (!memoryStore.has(key)) {
-//           memoryStore.set(key, []);
-//         }
-//         memoryStore.get(key).unshift(value);
-//         return memoryStore.get(key).length;
-//       },
-//       lRange: async (key, start, stop) => {
-//         return memoryStore.get(key) || [];
-//       },
-//       del: async (key) => {
-//         memoryStore.delete(key);
-//         return 1;
-//       },
-//       isOpen: true
-//     };
-//   }
-// })();
-
-// // Initialize news data on server start
-
-// (async () => {
-//   try {
-//     console.log('Initializing real news data...');
-//     const result = await newsFetcher.processAndStoreRealArticles();
-    
-//     if (result.success) {
-//       console.log('Real news data initialization complete');
-//     } else {
-//       console.log('News data initialization completed with some errors, but server will continue');
-//       console.log('Error:', result.error);
-//     }
-//   } catch (error) {
-//     console.error('Error in news data initialization, but continuing server startup:', error.message);
-//   }
-// })();
-
-// // Routes
-// app.get('/api/health', (req, res) => {
-//   res.json({ 
-//     status: 'OK', 
-//     message: 'Server is running',
-//     redis: redisConnected ? 'connected' : 'disconnected'
-//   });
-// });
-
-// // Chat history routes with Redis fallback
-// app.get('/api/chat/history/:sessionId', async (req, res) => {
-//   try {
-//     const { sessionId } = req.params;
-//     let history = [];
-    
-//     if (redisConnected) {
-//       history = await redisClient.lRange(`chat:${sessionId}`, 0, -1);
-//       history = history.map(item => JSON.parse(item)).reverse();
-//     }
-    
-//     res.json({ history });
-//   } catch (error) {
-//     console.error('Error retrieving chat history:', error);
-//     res.json({ history: [] });
-//   }
-// });
-
-// app.delete('/api/chat/history/:sessionId', async (req, res) => {
-//   try {
-//     const { sessionId } = req.params;
-    
-//     if (redisConnected) {
-//       await redisClient.del(`chat:${sessionId}`);
-//     }
-    
-//     res.json({ message: 'Chat history cleared' });
-//   } catch (error) {
-//     console.error('Error clearing chat history:', error);
-//     res.json({ message: 'Chat history cleared' });
-//   }
-// });
-
-// // Socket.io for real-time communication
-// io.on('connection', (socket) => {
-//   console.log('User connected:', socket.id);
-
-//   socket.on('join', (sessionId) => {
-//     socket.join(sessionId);
-//     console.log(`Socket ${socket.id} joined session ${sessionId}`);
-//   });
-
-// // Update the send_message event handler in server.js
-// socket.on('send_message', async (data) => {
-//   try {
-//     const { message, sessionId } = data;
-    
-//     if (!message || !sessionId) {
-//       socket.emit('error', { message: 'Missing message or sessionId' });
-//       return;
-//     }
-    
-//     // Store user message immediately
-//     const userMessage = { role: 'user', content: message, timestamp: new Date().toISOString() };
-    
-//     if (redisConnected) {
-//       await redisClient.lPush(`chat:${sessionId}`, JSON.stringify(userMessage));
-//     }
-    
-//     // Emit user message to client - send to ALL clients in the session room
-//     io.to(sessionId).emit('receive_message', userMessage);
-    
-//     // Process message with RAG
-//     const result = await ragService.processQuery(message);
-    
-//     // Store assistant response
-//     const assistantMessage = { 
-//       role: 'assistant', 
-//       content: result.response, 
-//       sources: result.sources,
-//       timestamp: new Date().toISOString()
-//     };
-    
-//     if (redisConnected) {
-//       await redisClient.lPush(`chat:${sessionId}`, JSON.stringify(assistantMessage));
-//     }
-    
-//     // Send response to ALL clients in the session room
-//     io.to(sessionId).emit('receive_message', assistantMessage);
-    
-//   } catch (error) {
-//     console.error('Error processing message:', error);
-    
-//     // Send error message to the specific client that sent the message
-//     const errorMessage = {
-//       role: 'error',
-//       content: 'Sorry, I encountered an error processing your request. Please try again.',
-//       timestamp: new Date().toISOString()
-//     };
-    
-//     socket.emit('receive_message', errorMessage);
-//   }
-// });
-
-//   socket.on('disconnect', () => {
-//     console.log('User disconnected:', socket.id);
-//   });
-// });
-
-// const PORT = process.env.PORT || 5001;
-// server.listen(PORT, () => {
-//   console.log(`Server running on port ${PORT}`);
-//   console.log(`CORS enabled for: http://localhost:3000`);
-// });
