@@ -12,7 +12,6 @@ dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
-const cors = require('cors');
 
 
 // Correct CORS configuration for Socket.IO
